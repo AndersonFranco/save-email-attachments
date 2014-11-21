@@ -61,7 +61,7 @@ class SaveEmailAttachments {
   /**
    * Decode message
    */
-  protected function getdecodevalue($message, $coding) {
+  protected function decodeMessage($message, $coding) {
     switch($coding) {
       case 0:
       case 1:
@@ -159,7 +159,7 @@ class SaveEmailAttachments {
           $params   = $part->dparameters;
           $fileName = $part->dparameters[0]->value;
           $mbody    = imap_fetchbody($mbox, $overview->msgno, $fpos);
-          $content  = $this->getdecodevalue($mbody, $part->type);
+          $content  = $this->decodeMessage($mbody, $part->type);
           $saveAs   = preg_replace("/[^a-z0-9._]/", "", str_replace(" ", "_", str_replace("%20", "_", strtolower(basename($fileName)))));
 
           if ($saveAs != '') {
