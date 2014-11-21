@@ -26,41 +26,41 @@
  */
 class SaveEmailAttachments {
 
-	protected $mailbox  = ''; // e.g. "{imap.gmail.com:993/imap/ssl}INBOX";
-	protected $username = ''; // e.g. username@gmail.com
-	protected $password = ''; // e.g. 12345
+  protected $mailbox  = ''; // e.g. "{imap.gmail.com:993/imap/ssl}INBOX";
+  protected $username = ''; // e.g. username@gmail.com
+  protected $password = ''; // e.g. 12345
 
-	/**
-	 * Relative path to a nested directory of this file
-	 *
-	 * Trailing slash is mandatory ('/' at the end)
-	 */
-	protected $filesPath = 'files/';
-	protected $dataPath  = 'data/';
+  /**
+   * Relative path to a nested directory of this file
+   *
+   * Trailing slash is mandatory ('/' at the end)
+   */
+  protected $filesPath = 'files/';
+  protected $dataPath  = 'data/';
 
-	/**
-	 * Constructor (mailbox, username, password)
-	 */
-	public function SaveEmailAttachments($m = null, $u = null, $p = null) {
+  /**
+   * Constructor (mailbox, username, password)
+   */
+  public function SaveEmailAttachments($m = null, $u = null, $p = null) {
 
-		if ($m !== null) $this->mailbox  = $m;
-		if ($u !== null) $this->username = $u;
-		if ($p !== null) $this->password = $p;
+    if ($m !== null) $this->mailbox  = $m;
+    if ($u !== null) $this->username = $u;
+    if ($p !== null) $this->password = $p;
 
-	  if (!function_exists('imap_open')) {
-	    throw new Exception("IMAP module not available.", 1);	    
-	  }
+    if (!function_exists('imap_open')) {
+      throw new Exception("IMAP module not available.", 1);     
+    }
 
-	  if (!file_exists($this->dataPath)) {
-	    if (!mkdir($this->dataPath, 0755, true)) {
-	      throw new Exception("Unable to create {$this->dataPath} folder.", 1);
-	    }
-	  }		
-	}
+    if (!file_exists($this->dataPath)) {
+      if (!mkdir($this->dataPath, 0755, true)) {
+        throw new Exception("Unable to create {$this->dataPath} folder.", 1);
+      }
+    }   
+  }
 
-	/**
-	 * Decode message
-	 */
+  /**
+   * Decode message
+   */
   protected function getdecodevalue($message, $coding) {
     switch($coding) {
       case 0:
@@ -100,118 +100,118 @@ class SaveEmailAttachments {
    */
   public function run($verbose = null) {
 
-  	$mbox = imap_open($this->mailbox, $this->username, $this->password);
-  	if (!$mbox) {
-  		throw new Exception("Connection failed: " . imap_last_error(), 1);
-  	}
+    $mbox = imap_open($this->mailbox, $this->username, $this->password);
+    if (!$mbox) {
+      throw new Exception("Connection failed: " . imap_last_error(), 1);
+    }
      
     $MC            = imap_check($mbox);
-		$result        = imap_fetch_overview($mbox, "1:{$MC->Nmsgs}", 0);
-  	$emailMessages = 0;
+    $result        = imap_fetch_overview($mbox, "1:{$MC->Nmsgs}", 0);
+    $emailMessages = 0;
 
-  	/**
-  	 * Process each e-mail message
-  	 */
-	  foreach ($result as $overview) {
+    /**
+     * Process each e-mail message
+     */
+    foreach ($result as $overview) {
 
-	  	/**
-	  	 * Skip old messages
-	  	 */
-	    if ($overview->seen) continue;
+      /**
+       * Skip old messages
+       */
+      if ($overview->seen) continue;
 
-	    $files  = 0;
-	    $errors = 0;
-	    $emailMessages++;
+      $files  = 0;
+      $errors = 0;
+      $emailMessages++;
 
-	    /**
-	     * Create a folder for each message
-	     *
-	     * If already exists, set message as Seen
-	     */
-	    $folder = (int) $overview->uid;
-	    if ($folder > 0) {
-	      if (file_exists($this->filesPath . $folder)) {
-	      	if ($verbose) {
-	      		echo "#{$overview->uid} already downloaded." . PHP_EOL;
-	      	}
-	        imap_setflag_full($mbox, $overview->msgno, "\\Seen");
-	        continue;
-	      }
-	      if (!mkdir($this->filesPath . $folder, 0755, true)) {
-	        throw new Exception('Unable to create new folder: ' 
-	        										. $this->filesPath . $folder, 1);
-	      }
-	    } else {
-	      continue;
-	    }
+      /**
+       * Create a folder for each message
+       *
+       * If already exists, set message as Seen
+       */
+      $folder = (int) $overview->uid;
+      if ($folder > 0) {
+        if (file_exists($this->filesPath . $folder)) {
+          if ($verbose) {
+            echo "#{$overview->uid} already downloaded." . PHP_EOL;
+          }
+          imap_setflag_full($mbox, $overview->msgno, "\\Seen");
+          continue;
+        }
+        if (!mkdir($this->filesPath . $folder, 0755, true)) {
+          throw new Exception('Unable to create new folder: ' 
+                              . $this->filesPath . $folder, 1);
+        }
+      } else {
+        continue;
+      }
 
-	    /**
-	     * Save attachments
-	     */
-	    $structure = imap_fetchstructure($mbox, $overview->msgno);
-	    $parts     = isset($structure->parts) ? $structure->parts : 0;
-	    $fpos      = 2;
+      /**
+       * Save attachments
+       */
+      $structure = imap_fetchstructure($mbox, $overview->msgno);
+      $parts     = isset($structure->parts) ? $structure->parts : 0;
+      $fpos      = 2;
 
-	    for($i = 1; $i < count($parts); $i++) {
-	      $part = $parts[$i];
-	      if (isset($part->disposition) && strtolower($part->disposition) == "attachment") {
-	        $ext      = $part->subtype;
-	        $params   = $part->dparameters;
-	        $fileName = $part->dparameters[0]->value;
-	        $mbody    = imap_fetchbody($mbox, $overview->msgno, $fpos);
-	        $content  = $this->getdecodevalue($mbody, $part->type);
-	        $saveAs   = preg_replace("/[^a-z0-9._]/", "", str_replace(" ", "_", str_replace("%20", "_", strtolower(basename($fileName)))));
+      for($i = 1; $i < count($parts); $i++) {
+        $part = $parts[$i];
+        if (isset($part->disposition) && strtolower($part->disposition) == "attachment") {
+          $ext      = $part->subtype;
+          $params   = $part->dparameters;
+          $fileName = $part->dparameters[0]->value;
+          $mbody    = imap_fetchbody($mbox, $overview->msgno, $fpos);
+          $content  = $this->getdecodevalue($mbody, $part->type);
+          $saveAs   = preg_replace("/[^a-z0-9._]/", "", str_replace(" ", "_", str_replace("%20", "_", strtolower(basename($fileName)))));
 
-	        if ($saveAs != '') {
-	          $fp = fopen($this->filesPath . $folder . '/' . $saveAs, 'w');
-	          fputs($fp, $content);
-	          fclose($fp);
-	        } else {
-	          $errors++;
-	        }
+          if ($saveAs != '') {
+            $fp = fopen($this->filesPath . $folder . '/' . $saveAs, 'w');
+            fputs($fp, $content);
+            fclose($fp);
+          } else {
+            $errors++;
+          }
 
-	        $fpos++;
-	        $files++;
-	      }
-	    }
+          $fpos++;
+          $files++;
+        }
+      }
 
-	    /**
-	     * On success save data from e-mail
-	     *
-	     * Otherwise, delete files and set message to Unread
-	     */
-	    if ($files > 0 && $errors == 0) {
-	      file_put_contents($this->dataPath . $folder . '.json', json_encode(array(
-	          'uid'     => $overview->uid,
-	          'from'    => $overview->from,
-	          'subject' => $overview->subject
-	        )), LOCK_EX);
-	    } else {
-	    	if ($verbose) {
-	    		echo "Skipping ";
-	    	}
+      /**
+       * On success save data from e-mail
+       *
+       * Otherwise, delete files and set message to Unread
+       */
+      if ($files > 0 && $errors == 0) {
+        file_put_contents($this->dataPath . $folder . '.json', json_encode(array(
+            'uid'     => $overview->uid,
+            'from'    => $overview->from,
+            'subject' => $overview->subject
+          )), LOCK_EX);
+      } else {
+        if ($verbose) {
+          echo "Skipping ";
+        }
         imap_clearflag_full($mbox, $overview->msgno, "\\Seen");
-	      $this->delTree($this->filesPath . $folder);
-	    }
-	    if ($verbose) {
-	      echo "#{$overview->uid} "
-	        . htmlentities($overview->from, ENT_COMPAT, "UTF-8")
-	        . " {$overview->subject}" . PHP_EOL;
+        $this->delTree($this->filesPath . $folder);
+      }
+      if ($verbose) {
+        echo "#{$overview->uid} "
+          . htmlentities($overview->from, ENT_COMPAT, "UTF-8")
+          . " {$overview->subject}" . PHP_EOL;
        }
 
-	    /**
-	     * On error, print message if verbose = true
-	     */
-	    if ($errors > 0) {
-	    	if ($verbose) {
-	    		echo "Error on processing e-mail #{$overview->uid}." . PHP_EOL;
-	    	}
-	    }
+      /**
+       * On error, print message if verbose = true
+       */
+      if ($errors > 0) {
+        if ($verbose) {
+          echo "Error on processing e-mail #{$overview->uid}." . PHP_EOL;
+        }
+      }
 
-	  }
+    }
 
-	  imap_close($mbox);
-	  return $emailMessages;
+    imap_close($mbox);
+    return $emailMessages;
   }
 
   /*
@@ -219,22 +219,22 @@ class SaveEmailAttachments {
    */
   public function printFiles($html = null) {
 
-	  $email = glob($this->dataPath . '*.json');
+    $email = glob($this->dataPath . '*.json');
 
-	  foreach($email AS $e) {
-	    $ema = json_decode(file_get_contents($e));
+    foreach($email AS $e) {
+      $ema = json_decode(file_get_contents($e));
 
-	    echo "#{$ema->uid} "
-	      		.  htmlentities($ema->from, ENT_COMPAT, "UTF-8")
-	      		.  " {$ema->subject}" . PHP_EOL;
+      echo "#{$ema->uid} "
+            .  htmlentities($ema->from, ENT_COMPAT, "UTF-8")
+            .  " {$ema->subject}" . PHP_EOL;
 
-	    $anexos = glob($this->filesPath . (int) $ema->uid . '/*.*');
-	    foreach ($anexos AS $anexo) {
-	      echo "- ", ($html) ? "<a target=\"_blank\" href=\"" . $anexo . "\">" : '',
-	      		basename($anexo), ($html) ? "</a>" : '', PHP_EOL;
-	    }
-	    echo PHP_EOL;
-	  }
+      $anexos = glob($this->filesPath . (int) $ema->uid . '/*.*');
+      foreach ($anexos AS $anexo) {
+        echo "- ", ($html) ? "<a target=\"_blank\" href=\"" . $anexo . "\">" : '',
+            basename($anexo), ($html) ? "</a>" : '', PHP_EOL;
+      }
+      echo PHP_EOL;
+    }
 
   }
 
